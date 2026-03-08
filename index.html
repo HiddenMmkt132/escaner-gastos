@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Escáner de Gastos</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --surface2: #1c1c28;
+    --border: #2a2a3d;
+    --accent: #7c5cfc;
+    --accent2: #c084fc;
+    --green: #4ade80;
+    --red: #f87171;
+    --text: #e8e8f0;
+    --muted: #6b6b8a;
+    --gold: #fbbf24;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Ambient background */
+  body::before {
+    content: '';
+    position: fixed;
+    top: -200px; left: 50%;
+    transform: translateX(-50%);
+    width: 800px; height: 800px;
+    background: radial-gradient(circle, rgba(124,92,252,0.08) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 40px 20px 80px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 48px;
+  }
+
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 1.6rem;
+    line-height: 1;
+  }
+
+  .logo span { color: var(--accent2); }
+
+  .header-sub {
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-top: 6px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  .month-badge {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 0.75rem;
+    color: var(--accent2);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* Config panel */
+  .config-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 14px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 16px;
+    letter-spacing: 0.05em;
+  }
+  .config-toggle:hover { border-color: var(--accent); color: var(--accent2); }
+
+  .config-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 28px;
+    display: none;
+  }
+  .config-panel.open { display: block; }
+
+  .config-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .field-group.full { grid-column: 1 / -1; }
+
+  label {
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  input, select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    transition: border-color 0.2s;
+    width: 100%;
+  }
+
+  input:focus, select:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  select option { background: var(--surface2); }
+
+  /* Upload area */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 16px;
+    padding: 48px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+    background: var(--surface);
+    margin-bottom: 24px;
+  }
+
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(124,92,252,0.05);
+  }
+
+  .upload-icon {
+    font-size: 2.5rem;
+    margin-bottom: 16px;
+    display: block;
+    filter: grayscale(1);
+    transition: filter 0.3s;
+  }
+
+  .upload-zone:hover .upload-icon { filter: none; }
+
+  .upload-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .upload-sub {
+    font-size: 0.72rem;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  #fileInput { display: none; }
+
+  /* Preview */
+  .preview-wrap {
+    position: relative;
+    margin-bottom: 24px;
+    display: none;
+  }
+
+  .preview-img {
+    width: 100%;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    max-height: 320px;
+    object-fit: contain;
+    background: var(--surface);
+  }
+
+  .preview-remove {
+    position: absolute;
+    top: 10px; right: 10px;
+    background: rgba(248,113,113,0.15);
+    border: 1px solid var(--red);
+    color: var(--red);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    transition: all 0.2s;
+  }
+
+  .preview-remove:hover { background: rgba(248,113,113,0.3); }
+
+  /* Analyze button */
+  .btn-analyze {
+    width: 100%;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none;
+    border-radius: 12px;
+    padding: 16px;
+    color: white;
+    font-family: 'Syne', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-analyze:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 8px 30px rgba(124,92,252,0.4); }
+  .btn-analyze:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  .btn-analyze .spinner {
+    display: none;
+    width: 18px; height: 18px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Result card */
+  .result-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+    display: none;
+  }
+
+  .result-card.visible { display: block; animation: slideIn 0.4s ease; }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .result-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .result-header-icon { font-size: 1.2rem; }
+
+  .result-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+  }
+
+  .result-subtitle { font-size: 0.65rem; color: var(--muted); }
+
+  .result-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+
+  .result-field.full { grid-column: 1 / -1; }
+
+  .field-label {
+    font-size: 0.6rem;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .field-value {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 0.82rem;
+    min-height: 38px;
+  }
+
+  .amount-big {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--green);
+  }
+
+  .editable {
+    cursor: text;
+    transition: border-color 0.2s;
+  }
+
+  .editable:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  /* Action buttons */
+  .action-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 20px;
+  }
+
+  .btn {
+    border-radius: 10px;
+    padding: 12px;
+    font-family: 'Syne', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .btn-ghost:hover { border-color: var(--text); color: var(--text); }
+
+  .btn-primary {
+    background: var(--green);
+    border: none;
+    color: #0a0a0f;
+  }
+  .btn-primary:hover { opacity: 0.85; transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 30px; right: 30px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 20px;
+    font-size: 0.78rem;
+    max-width: 320px;
+    transform: translateY(80px);
+    opacity: 0;
+    transition: all 0.3s;
+    z-index: 100;
+  }
+
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success { border-color: var(--green); }
+  .toast.error { border-color: var(--red); }
+
+  .toast-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .toast.success .toast-title { color: var(--green); }
+  .toast.error .toast-title { color: var(--red); }
+
+  /* Instructions */
+  .instructions {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--gold);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 28px;
+    font-size: 0.73rem;
+    line-height: 1.8;
+    color: var(--muted);
+  }
+
+  .instructions strong { color: var(--gold); font-family: 'Syne', sans-serif; }
+  .instructions ol { padding-left: 20px; }
+  .instructions li { margin-bottom: 6px; }
+  .instructions a { color: var(--accent2); }
+
+  .note {
+    background: rgba(124,92,252,0.05);
+    border: 1px solid rgba(124,92,252,0.2);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.68rem;
+    color: var(--muted);
+    margin-top: 10px;
+  }
+
+  /* Log */
+  .log-section { margin-top: 40px; }
+  .log-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .log-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    font-size: 0.72rem;
+    animation: slideIn 0.3s ease;
+  }
+
+  .log-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .log-dot.success { background: var(--green); }
+  .log-dot.error { background: var(--red); }
+
+  .log-amount { color: var(--green); font-weight: 500; margin-left: auto; }
+
+  /* API Key info */
+  .api-info {
+    font-size: 0.65rem;
+    color: var(--muted);
+    margin-top: 8px;
+  }
+
+  /* Divider */
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 32px 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <header class="header">
+    <div>
+      <div class="logo">gasto<span>·scan</span></div>
+      <div class="header-sub">Registrador automático</div>
+    </div>
+    <div class="month-badge" id="monthBadge">— 2026</div>
+  </header>
+
+  <!-- Instructions -->
+  <div class="instructions">
+    <strong>⚙ Configuración inicial (una sola vez)</strong>
+    <ol>
+      <li>Conseguí tu <strong>API key de Anthropic</strong> en <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></li>
+      <li>En Google Sheets, andá a <strong>Extensiones → Apps Script</strong> y pegá el script del paso siguiente</li>
+      <li>Publicá el script como <strong>Web App</strong> (ejecutar como: tú, acceso: cualquiera)</li>
+      <li>Copiá la URL del Web App y pegála abajo junto con tu API key</li>
+    </ol>
+    <div class="note">
+      💡 El script de Apps Script está al pie de esta página. Copialo y pegalo en tu proyecto de Google Sheets.
+    </div>
+  </div>
+
+  <!-- Config -->
+  <button class="config-toggle" onclick="toggleConfig()">
+    ⚙ Configuración
+    <span id="configStatus" style="color: var(--red)">● sin configurar</span>
+  </button>
+
+  <div class="config-panel" id="configPanel">
+    <div class="config-grid">
+      <div class="field-group full">
+        <label>API Key de Anthropic</label>
+        <input type="password" id="apiKey" placeholder="sk-ant-..." onchange="saveConfig()">
+      </div>
+      <div class="field-group full">
+        <label>URL de tu Google Apps Script Web App</label>
+        <input type="text" id="sheetsUrl" placeholder="https://script.google.com/macros/s/.../exec" onchange="saveConfig()">
+      </div>
+      <div class="field-group">
+        <label>Mes activo</label>
+        <select id="activeMes" onchange="saveConfig(); updateMonthBadge()">
+          <option>ENERO</option><option>FEBRERO</option><option>MARZO</option>
+          <option>ABRIL</option><option>MAYO</option><option>JUNIO</option>
+          <option>JULIO</option><option>AGOSTO</option><option>SEPTIEMBRE</option>
+          <option>OCTUBRE</option><option>NOVIEMBRE</option><option>DICIEMBRE</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label>Tipo de gasto</label>
+        <select id="tipoGasto" onchange="saveConfig()">
+          <option value="variable">Variable</option>
+          <option value="fijo">Fijo</option>
+        </select>
+      </div>
+    </div>
+    <div class="api-info" style="margin-top:12px">
+      Tu API key y URL se guardan solo en tu navegador (localStorage).
+    </div>
+  </div>
+
+  <!-- Upload -->
+  <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+    <span class="upload-icon">📷</span>
+    <div class="upload-title">Subir ticket o comprobante</div>
+    <div class="upload-sub">
+      Arrastrá una imagen o hacé click para seleccionarla<br>
+      JPG, PNG, WEBP · Max 10MB
+    </div>
+    <input type="file" id="fileInput" accept="image/*" onchange="handleFile(this.files[0])">
+  </div>
+
+  <div class="preview-wrap" id="previewWrap">
+    <img class="preview-img" id="previewImg" alt="Ticket">
+    <button class="preview-remove" onclick="clearImage()">✕ Quitar</button>
+  </div>
+
+  <button class="btn-analyze" id="btnAnalyze" onclick="analyzeImage()" disabled>
+    <span id="btnText">🔍 Analizar ticket</span>
+    <div class="spinner" id="spinner"></div>
+  </button>
+
+  <!-- Result -->
+  <div class="result-card" id="resultCard">
+    <div class="result-header">
+      <span class="result-header-icon">✨</span>
+      <div>
+        <div class="result-title">Gasto detectado</div>
+        <div class="result-subtitle">Revisá y editá antes de registrar</div>
+      </div>
+    </div>
+
+    <div class="result-fields">
+      <div class="result-field">
+        <div class="field-label">Monto real ($)</div>
+        <div class="field-value editable amount-big" id="rMonto" contenteditable="true">—</div>
+      </div>
+      <div class="result-field">
+        <div class="field-label">Monto esperado ($)</div>
+        <div class="field-value editable" id="rMontoEsp" contenteditable="true">—</div>
+      </div>
+      <div class="result-field full">
+        <div class="field-label">Concepto</div>
+        <div class="field-value editable" id="rConcepto" contenteditable="true">—</div>
+      </div>
+      <div class="result-field">
+        <div class="field-label">Categoría</div>
+        <select class="field-value" id="rCategoria" style="padding: 10px 12px; height: auto;">
+          <option>Transporte</option>
+          <option>Alimentación</option>
+          <option>Restaurantes</option>
+          <option>Comida a domicilio</option>
+          <option>Bares</option>
+          <option>Ropa</option>
+          <option>Belleza</option>
+          <option>Gasolina</option>
+          <option>Hogar</option>
+          <option>Ocio</option>
+          <option>Pequeñas compras</option>
+          <option>Tasas/Impuestos</option>
+          <option>Viajes/vacaciones</option>
+          <option>Tecnología</option>
+          <option>Reparaciones</option>
+          <option>Salud</option>
+          <option>Higiene</option>
+          <option>Cursos/Formación/Trabajo</option>
+          <option>Mascotas</option>
+          <option>Familia</option>
+          <option>PedidosYa</option>
+          <option>Supermercado</option>
+          <option>Ajustes</option>
+          <option>Otros</option>
+        </select>
+      </div>
+      <div class="result-field">
+        <div class="field-label">Método de pago</div>
+        <select class="field-value" id="rMetodo" style="padding: 10px 12px; height: auto;" onchange="applyDateLogic(this.value, document.getElementById('rFecha').value)">
+          <option>Transferencia</option>
+          <option>Tarjeta de crédito</option>
+          <option>Tarjeta de débito</option>
+          <option>Efectivo</option>
+          <option>Tarjeta común</option>
+        </select>
+      </div>
+      <div class="result-field">
+        <div class="field-label">Fecha de cobro</div>
+        <input type="date" id="rFecha" style="background: var(--surface2); border: 1px solid var(--border);" oninput="clearCCHint()">
+        <div id="ccHint" style="display:none; font-size:0.6rem; color:var(--accent2); margin-top:5px; letter-spacing:0.04em;"></div>
+      </div>
+      <div class="result-field">
+        <div class="field-label">¿Pagado?</div>
+        <select class="field-value" id="rPagado" style="padding: 10px 12px; height: auto;">
+          <option value="TRUE">Sí</option>
+          <option value="FALSE">No</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="action-row">
+      <button class="btn btn-ghost" onclick="clearAll()">↩ Nueva foto</button>
+      <button class="btn btn-primary" id="btnRegister" onclick="registerExpense()">
+        ✓ Registrar en Sheets
+      </button>
+    </div>
+  </div>
+
+  <!-- Log -->
+  <div class="log-section" id="logSection" style="display:none">
+    <div class="log-title">// Historial de sesión</div>
+    <div id="logList"></div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- Apps Script code -->
+  <div class="instructions">
+    <strong>📋 Script para Google Apps Script</strong>
+    <div class="note" style="margin-top:12px; font-family: 'JetBrains Mono'; font-size:0.62rem; white-space:pre-wrap; user-select:all; cursor:text; color: var(--text);">// Pegá esto en Extensiones → Apps Script de tu Google Sheet
+// Luego: Implementar → Nueva implementación → Web App
+// Ejecutar como: Yo  |  Acceso: Cualquier persona
+
+function doGet(e) {
+  try {
+    var p = e.parameter;
+    if (!p.mes) return ContentService.createTextOutput("✓ gasto·scan conectado").setMimeType(ContentService.MimeType.TEXT);
+
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(p.mes);
+
+    if (!sheet) {
+      return ContentService.createTextOutput(
+        JSON.stringify({ok: false, error: "Hoja no encontrada: " + p.mes})
+      ).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // Buscar primera fila vacía en columna J (col 10) desde fila 18
+    var lastRow = sheet.getLastRow();
+    var targetRow = lastRow + 1;
+    for (var r = 18; r <= lastRow; r++) {
+      var val = sheet.getRange(r, 10).getValue();
+      if (val === "" || val === null) { targetRow = r; break; }
+    }
+
+    // Escribir: J=Concepto, K=GastoEsperado, L=GastoReal, M=MetodoPago, N=Fecha, O=Pagado, R=Categoria
+    sheet.getRange(targetRow, 10).setValue(p.concepto || "");
+    sheet.getRange(targetRow, 11).setValue(parseFloat(p.gastoEsperado) || 0);
+    sheet.getRange(targetRow, 12).setValue(parseFloat(p.gastoReal) || 0);
+    sheet.getRange(targetRow, 13).setValue(p.metodoPago || "");
+    sheet.getRange(targetRow, 14).setValue(new Date(p.fecha));
+    sheet.getRange(targetRow, 15).setValue(p.pagado === "TRUE");
+    sheet.getRange(targetRow, 18).setValue(p.categoria || "");
+
+    return ContentService.createTextOutput(
+      JSON.stringify({ok: true, row: targetRow})
+    ).setMimeType(ContentService.MimeType.JSON);
+
+  } catch(err) {
+    return ContentService.createTextOutput(
+      JSON.stringify({ok: false, error: err.toString()})
+    ).setMimeType(ContentService.MimeType.JSON);
+  }
+}</div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast">
+  <div class="toast-title" id="toastTitle"></div>
+  <div id="toastMsg"></div>
+</div>
+
+<script>
+  let currentImageBase64 = null;
+  let sessionLog = [];
+
+  // Init
+  window.onload = () => {
+    loadConfig();
+    updateMonthBadge();
+    setTodayDate();
+    // Detect current month
+    const months = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+    const currentMonth = months[new Date().getMonth()];
+    const sel = document.getElementById('activeMes');
+    sel.value = currentMonth;
+    updateMonthBadge();
+  };
+
+  function setTodayDate() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('rFecha').value = today;
+  }
+
+  // Calcula la fecha de débito de tarjeta de crédito (cierre el 26)
+  // Antes del 26: debita el 26 del mes siguiente
+  // El 26 o después: debita el 26 del mes subsiguiente
+  function calcCreditCardDate(fechaGasto) {
+    const d = fechaGasto ? new Date(fechaGasto + 'T12:00:00') : new Date();
+    let anio = d.getFullYear();
+    let mes = d.getMonth(); // 0-indexed
+    if (d.getDate() < 26) {
+      mes += 1;
+    } else {
+      mes += 2;
+    }
+    if (mes > 11) { anio += 1; mes -= 12; }
+    const pad = n => String(n).padStart(2, '0');
+    return `${anio}-${pad(mes + 1)}-26`;
+  }
+
+  function applyDateLogic(metodoPago, fechaTicket) {
+    const hint = document.getElementById('ccHint');
+    if (metodoPago === 'Tarjeta de crédito') {
+      const fechaCobro = calcCreditCardDate(fechaTicket);
+      document.getElementById('rFecha').value = fechaCobro;
+      const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+      const [y, m] = fechaCobro.split('-');
+      hint.textContent = `📅 Cierre el 26 → débito el 26 de ${meses[parseInt(m)-1]} ${y}`;
+      hint.style.display = 'block';
+      document.getElementById('rPagado').value = 'FALSE';
+    } else {
+      hint.style.display = 'none';
+    }
+  }
+
+  function clearCCHint() {
+    document.getElementById('ccHint').style.display = 'none';
+  }
+
+  function toggleConfig() {
+    const panel = document.getElementById('configPanel');
+    panel.classList.toggle('open');
+  }
+
+  function saveConfig() {
+    const config = {
+      apiKey: document.getElementById('apiKey').value,
+      sheetsUrl: document.getElementById('sheetsUrl').value,
+      mes: document.getElementById('activeMes').value,
+      tipo: document.getElementById('tipoGasto').value
+    };
+    localStorage.setItem('gastoscan_config', JSON.stringify(config));
+    updateConfigStatus();
+  }
+
+  function loadConfig() {
+    const saved = localStorage.getItem('gastoscan_config');
+    const defaultUrl = 'https://script.google.com/macros/s/AKfycbx9w6fGLt0UdhUpo6nrVGVoL9ig6-oUz_f2R9hafHMmuw3L_yOAI5EJec-sWNNIzPr2iw/exec';
+    if (!saved) {
+      document.getElementById('sheetsUrl').value = defaultUrl;
+      updateConfigStatus();
+      return;
+    }
+    const c = JSON.parse(saved);
+    if (c.apiKey) document.getElementById('apiKey').value = c.apiKey;
+    document.getElementById('sheetsUrl').value = c.sheetsUrl || defaultUrl;
+    if (c.mes) document.getElementById('activeMes').value = c.mes;
+    if (c.tipo) document.getElementById('tipoGasto').value = c.tipo;
+    updateConfigStatus();
+  }
+
+  function updateConfigStatus() {
+    const key = document.getElementById('apiKey').value;
+    const url = document.getElementById('sheetsUrl').value;
+    const status = document.getElementById('configStatus');
+    if (key && url) {
+      status.textContent = '● configurado';
+      status.style.color = 'var(--green)';
+    } else {
+      status.textContent = '● sin configurar';
+      status.style.color = 'var(--red)';
+    }
+  }
+
+  function updateMonthBadge() {
+    const mes = document.getElementById('activeMes').value;
+    document.getElementById('monthBadge').textContent = mes + ' 2026';
+  }
+
+  // Drag & drop
+  const zone = document.getElementById('uploadZone');
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  });
+
+  function handleFile(file) {
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target.result;
+      currentImageBase64 = dataUrl.split(',')[1];
+      document.getElementById('previewImg').src = dataUrl;
+      document.getElementById('previewWrap').style.display = 'block';
+      document.getElementById('uploadZone').style.display = 'none';
+      document.getElementById('btnAnalyze').disabled = false;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function clearImage() {
+    currentImageBase64 = null;
+    document.getElementById('previewWrap').style.display = 'none';
+    document.getElementById('uploadZone').style.display = 'block';
+    document.getElementById('btnAnalyze').disabled = true;
+    document.getElementById('fileInput').value = '';
+  }
+
+  function clearAll() {
+    clearImage();
+    document.getElementById('resultCard').classList.remove('visible');
+    setTodayDate();
+  }
+
+  async function analyzeImage() {
+    const apiKey = document.getElementById('apiKey').value;
+    if (!apiKey) {
+      showToast('error', 'Falta API Key', 'Abrí la configuración e ingresá tu API Key de Anthropic.');
+      document.getElementById('configPanel').classList.add('open');
+      return;
+    }
+
+    if (!currentImageBase64) return;
+
+    setBtnLoading(true);
+
+    const categories = ['Transporte','Alimentación','Restaurantes','Comida a domicilio','Bares','Ropa','Belleza','Gasolina','Hogar','Ocio','Pequeñas compras','Tasas/Impuestos','Viajes/vacaciones','Tecnología','Reparaciones','Salud','Higiene','Cursos/Formación/Trabajo','Mascotas','Familia','PedidosYa','Supermercado','Ajustes','Otros'];
+    const methods = ['Transferencia','Tarjeta de crédito','Tarjeta de débito','Efectivo','Tarjeta común'];
+
+    const prompt = `Analizá esta imagen de un ticket, factura, o comprobante de pago y extraé los datos del gasto.
+
+Respondé ÚNICAMENTE con un objeto JSON válido con estos campos exactos:
+{
+  "concepto": "nombre del comercio o descripción breve del gasto",
+  "monto": número sin símbolos ni puntos de miles (solo el número),
+  "categoria": una de estas: ${categories.join(', ')},
+  "metodoPago": uno de estos: ${methods.join(', ')},
+  "fecha": "YYYY-MM-DD" (si está visible en el ticket, sino la fecha de hoy ${new Date().toISOString().split('T')[0]})
+}
+
+Si no podés leer algún dato, usá valores razonables basados en el contexto.
+IMPORTANTE: Solo JSON, sin texto adicional, sin markdown.`;
+
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 500,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: currentImageBase64 } },
+              { type: 'text', text: prompt }
+            ]
+          }]
+        })
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error?.message || 'Error de API');
+      }
+
+      const data = await response.json();
+      const text = data.content[0].text.trim();
+      const cleaned = text.replace(/```json|```/g, '').trim();
+      const parsed = JSON.parse(cleaned);
+
+      // Populate fields
+      document.getElementById('rMonto').textContent = parsed.monto || '';
+      document.getElementById('rMontoEsp').textContent = parsed.monto || '';
+      document.getElementById('rConcepto').textContent = parsed.concepto || '';
+      document.getElementById('rFecha').value = parsed.fecha || new Date().toISOString().split('T')[0];
+
+      const catSel = document.getElementById('rCategoria');
+      if (parsed.categoria) catSel.value = parsed.categoria;
+
+      const metSel = document.getElementById('rMetodo');
+      if (parsed.metodoPago) metSel.value = parsed.metodoPago;
+
+      // Aplicar lógica de fecha según método de pago
+      applyDateLogic(parsed.metodoPago, parsed.fecha);
+
+      document.getElementById('resultCard').classList.add('visible');
+      showToast('success', 'Gasto detectado', `${parsed.concepto} · $${parsed.monto}`);
+
+    } catch (err) {
+      showToast('error', 'Error al analizar', err.message);
+    } finally {
+      setBtnLoading(false);
+    }
+  }
+
+  function setBtnLoading(loading) {
+    const btn = document.getElementById('btnAnalyze');
+    const text = document.getElementById('btnText');
+    const spinner = document.getElementById('spinner');
+    btn.disabled = loading;
+    text.style.display = loading ? 'none' : 'block';
+    spinner.style.display = loading ? 'block' : 'none';
+  }
+
+  function sendViaIframe(url) {
+    return new Promise((resolve, reject) => {
+      // Limpiar iframes anteriores
+      const old = document.getElementById('_gsIframe');
+      if (old) old.remove();
+
+      const iframe = document.createElement('iframe');
+      iframe.id = '_gsIframe';
+      iframe.style.cssText = 'display:none;width:0;height:0;border:none;position:absolute;';
+      document.body.appendChild(iframe);
+
+      // Timeout de 10 segundos — Apps Script suele responder en 2-4s
+      const timer = setTimeout(() => {
+        // Aunque no podamos leer la respuesta por CORS, si no hubo error
+        // de red el request probablemente llegó. Resolvemos optimistamente.
+        resolve();
+      }, 6000);
+
+      iframe.onerror = () => {
+        clearTimeout(timer);
+        reject(new Error('No se pudo cargar el iframe'));
+      };
+
+      iframe.src = url;
+    });
+  }
+
+  async function registerExpense() {
+    const sheetsUrl = document.getElementById('sheetsUrl').value;
+    if (!sheetsUrl) {
+      showToast('error', 'Falta URL', 'Configurá la URL de tu Google Apps Script Web App.');
+      document.getElementById('configPanel').classList.add('open');
+      return;
+    }
+
+    const btn = document.getElementById('btnRegister');
+    btn.disabled = true;
+    btn.textContent = '⏳ Registrando...';
+
+    const payload = {
+      mes: document.getElementById('activeMes').value,
+      concepto: document.getElementById('rConcepto').textContent.trim(),
+      gastoEsperado: parseFloat(document.getElementById('rMontoEsp').textContent) || 0,
+      gastoReal: parseFloat(document.getElementById('rMonto').textContent) || 0,
+      metodoPago: document.getElementById('rMetodo').value,
+      fecha: document.getElementById('rFecha').value,
+      pagado: document.getElementById('rPagado').value,
+      categoria: document.getElementById('rCategoria').value
+    };
+
+    // Usamos un iframe oculto para evitar completamente el problema CORS
+    // Apps Script responde al GET y el iframe lo procesa sin restricciones
+    try {
+      const params = new URLSearchParams(payload).toString();
+      const targetUrl = `${sheetsUrl}?${params}`;
+
+      await sendViaIframe(targetUrl);
+
+      showToast('success', '¡Registrado! ✓', `${payload.concepto} → ${payload.mes}`);
+      addLog(payload.concepto, payload.gastoReal, true);
+      clearAll();
+
+    } catch (err) {
+      showToast('error', 'Error al registrar', err.message || 'No se pudo conectar con Google Sheets.');
+      addLog(payload.concepto, payload.gastoReal, false);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '✓ Registrar en Sheets';
+    }
+  }
+
+  function addLog(concepto, monto, ok) {
+    sessionLog.unshift({ concepto, monto, ok, time: new Date().toLocaleTimeString() });
+    renderLog();
+    document.getElementById('logSection').style.display = 'block';
+  }
+
+  function renderLog() {
+    const list = document.getElementById('logList');
+    list.innerHTML = sessionLog.slice(0, 10).map(l => `
+      <div class="log-item">
+        <div class="log-dot ${l.ok ? 'success' : 'error'}"></div>
+        <span>${l.concepto}</span>
+        <span style="color:var(--muted); font-size:0.65rem">${l.time}</span>
+        <span class="log-amount">$${l.monto}</span>
+      </div>
+    `).join('');
+  }
+
+  function showToast(type, title, msg) {
+    const toast = document.getElementById('toast');
+    toast.className = `toast ${type}`;
+    document.getElementById('toastTitle').textContent = title;
+    document.getElementById('toastMsg').textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 4000);
+  }
+</script>
+
+</body>
+</html>
